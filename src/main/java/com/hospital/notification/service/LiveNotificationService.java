@@ -25,6 +25,7 @@ public class LiveNotificationService {
     private final ConcurrentHashMap<String, List<NotificationRecord>> recentMap = new ConcurrentHashMap<>();
 
     public SseEmitter subscribe(String userId) {
+        validateUserId(userId);
         SseEmitter emitter = new SseEmitter(SSE_TIMEOUT);
         emitterMap.computeIfAbsent(userId, k -> new CopyOnWriteArrayList<>()).add(emitter);
         emitter.onCompletion(() -> removeEmitter(userId, emitter));
@@ -34,10 +35,12 @@ public class LiveNotificationService {
     }
 
     public synchronized List<NotificationRecord> getRecentNotifications(String userId) {
+        validateUserId(userId);
         return List.copyOf(recentMap.getOrDefault(userId, Collections.emptyList()));
     }
 
     public void publish(String userId, String type, String message) {
+        validateUserId(userId);
         NotificationRecord record = new NotificationRecord(type, message, OffsetDateTime.now().format(FORMATTER));
         store(userId, record);
         broadcastToUser(userId, record);
@@ -63,12 +66,24 @@ public class LiveNotificationService {
             }
         }
         emitters.removeAll(stale);
+        if (emitters.isEmpty()) {
+            emitterMap.remove(userId, emitters);
+        }
     }
 
     private void removeEmitter(String userId, SseEmitter emitter) {
         CopyOnWriteArrayList<SseEmitter> emitters = emitterMap.get(userId);
         if (emitters != null) {
             emitters.remove(emitter);
+            if (emitters.isEmpty()) {
+                emitterMap.remove(userId, emitters);
+            }
+        }
+    }
+
+    private void validateUserId(String userId) {
+        if (userId == null || userId.isBlank()) {
+            throw new IllegalArgumentException("userId는 null이거나 빈 값일 수 없습니다.");
         }
     }
 }
