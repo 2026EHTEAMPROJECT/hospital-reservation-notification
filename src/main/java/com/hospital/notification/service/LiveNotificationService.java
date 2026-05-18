@@ -8,45 +8,52 @@ import java.io.IOException;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 @Service
 public class LiveNotificationService {
 
     private static final int MAX_RECENT = 50;
+    private static final long SSE_TIMEOUT = 300_000L; // 5분
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    private final CopyOnWriteArrayList<SseEmitter> emitters = new CopyOnWriteArrayList<>();
-    private final List<NotificationRecord> recentNotifications = new ArrayList<>();
+    // userId 기준으로 emitter, 알림 이력 분리
+    private final ConcurrentHashMap<String, CopyOnWriteArrayList<SseEmitter>> emitterMap = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, List<NotificationRecord>> recentMap = new ConcurrentHashMap<>();
 
-    public SseEmitter subscribe() {
-        SseEmitter emitter = new SseEmitter(0L);
-        emitters.add(emitter);
-        emitter.onCompletion(() -> emitters.remove(emitter));
-        emitter.onTimeout(() -> emitters.remove(emitter));
-        emitter.onError(e -> emitters.remove(emitter));
+    public SseEmitter subscribe(String userId) {
+        SseEmitter emitter = new SseEmitter(SSE_TIMEOUT);
+        emitterMap.computeIfAbsent(userId, k -> new CopyOnWriteArrayList<>()).add(emitter);
+        emitter.onCompletion(() -> removeEmitter(userId, emitter));
+        emitter.onTimeout(() -> removeEmitter(userId, emitter));
+        emitter.onError(e -> removeEmitter(userId, emitter));
         return emitter;
     }
 
-    public synchronized List<NotificationRecord> getRecentNotifications() {
-        return List.copyOf(recentNotifications);
+    public synchronized List<NotificationRecord> getRecentNotifications(String userId) {
+        return List.copyOf(recentMap.getOrDefault(userId, Collections.emptyList()));
     }
 
-    public void publish(String type, String message) {
+    public void publish(String userId, String type, String message) {
         NotificationRecord record = new NotificationRecord(type, message, OffsetDateTime.now().format(FORMATTER));
-        store(record);
-        broadcast(record);
+        store(userId, record);
+        broadcastToUser(userId, record);
     }
 
-    private synchronized void store(NotificationRecord record) {
-        recentNotifications.add(record);
-        if (recentNotifications.size() > MAX_RECENT) {
-            recentNotifications.remove(0);
+    private synchronized void store(String userId, NotificationRecord record) {
+        List<NotificationRecord> list = recentMap.computeIfAbsent(userId, k -> new ArrayList<>());
+        list.add(record);
+        if (list.size() > MAX_RECENT) {
+            list.remove(0);
         }
     }
 
-    private void broadcast(NotificationRecord record) {
+    private void broadcastToUser(String userId, NotificationRecord record) {
+        CopyOnWriteArrayList<SseEmitter> emitters = emitterMap.get(userId);
+        if (emitters == null) return;
         List<SseEmitter> stale = new ArrayList<>();
         for (SseEmitter emitter : emitters) {
             try {
@@ -56,5 +63,12 @@ public class LiveNotificationService {
             }
         }
         emitters.removeAll(stale);
+    }
+
+    private void removeEmitter(String userId, SseEmitter emitter) {
+        CopyOnWriteArrayList<SseEmitter> emitters = emitterMap.get(userId);
+        if (emitters != null) {
+            emitters.remove(emitter);
+        }
     }
 }
