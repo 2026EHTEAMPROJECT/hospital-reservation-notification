@@ -9,6 +9,8 @@ spring:
     port: 5672
     username: ${RABBITMQ_USER:guest}
     password: ${RABBITMQ_PASSWORD:guest}
+  jackson:
+    default-property-inclusion: non_null
 
 management:
   endpoints:
