@@ -40,7 +40,9 @@ public class SecurityConfig {
             Object realmAccess = jwt.getClaim("realm_access");
             if (realmAccess instanceof Map<?, ?> ra && ra.get("roles") instanceof Collection<?> roles) {
                 for (Object role : roles) {
-                    authorities.add(new SimpleGrantedAuthority("ROLE_" + role));
+                    if (role instanceof String s && !s.isBlank()) {
+                        authorities.add(new SimpleGrantedAuthority("ROLE_" + s));
+                    }
                 }
             }
             return authorities;

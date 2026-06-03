@@ -1,0 +1,11 @@
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: http://localhost:0/realms/hospital/protocol/openid-connect/certs
+  rabbitmq:
+    listener:
+      simple:
+        auto-startup: false
+    dynamic: false
