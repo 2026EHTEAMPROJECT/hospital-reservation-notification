@@ -14,8 +14,18 @@ spring:
     port: ${RABBITMQ_PORT:5672}
     username: ${RABBITMQ_USER:guest}
     password: ${RABBITMQ_PASSWORD:guest}
+    listener:
+      simple:
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 2000
+        default-requeue-rejected: false
   jackson:
     default-property-inclusion: non_null
+
+clients:
+  user-service-url: ${USER_SERVICE_URL:http://localhost:8081}
 
 management:
   endpoints:
