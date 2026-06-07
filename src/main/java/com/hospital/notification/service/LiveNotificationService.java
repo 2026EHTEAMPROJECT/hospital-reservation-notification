@@ -41,7 +41,6 @@ public class LiveNotificationService {
         emitter.onTimeout(() -> removeEmitter(userId, emitter));
         emitter.onError(e -> removeEmitter(userId, emitter));
 
-        // ★ 추가
         try {
             emitter.send(
                     SseEmitter.event()
