@@ -15,6 +15,10 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class NotificationService {
 
+    private static final String UNKNOWN = "UNKNOWN";
+    private static final String DEFAULT_PATIENT_NAME = "환자";
+    private static final String DEFAULT_DOCTOR_NAME = "담당의";
+
     private final LiveNotificationService liveNotificationService;
     private final UserClient userClient;
     private final DoctorClient doctorClient;
@@ -84,17 +88,17 @@ public class NotificationService {
         String status =
                 message.status() != null
                         ? message.status()
-                        : "UNKNOWN";
+                        : UNKNOWN;
 
         String name =
                 user != null
                         ? user.name()
-                        : "환자";
+                        : DEFAULT_PATIENT_NAME;
 
         String doctorName =
                 doctor != null
                         ? doctor.name()
-                        : "담당의";
+                        : DEFAULT_DOCTOR_NAME;
 
         return switch (status) {
 
@@ -142,12 +146,12 @@ public class NotificationService {
         String status =
                 message.status() != null
                         ? message.status()
-                        : "UNKNOWN";
+                        : UNKNOWN;
 
         String name =
                 message.patientName() != null
                         ? message.patientName()
-                        : "환자";
+                        : DEFAULT_PATIENT_NAME;
 
         return switch (status) {
 
