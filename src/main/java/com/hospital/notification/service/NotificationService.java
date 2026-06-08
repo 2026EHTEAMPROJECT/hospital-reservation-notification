@@ -169,6 +169,16 @@ public class NotificationService {
                     "%s님, 결제에 실패하였습니다. 다시 시도해주세요."
                             .formatted(name);
 
+            case "REFUNDED" ->
+                    "%s님, 예약이 취소되어 %d원이 환불되었습니다. (결제번호: %d)"
+                            .formatted(
+                                    name,
+                                    message.amount() != null
+                                            ? message.amount()
+                                            : 0,
+                                    message.paymentId()
+                            );
+
             default ->
                     "%s님, 결제 상태가 변경되었습니다: %s"
                             .formatted(
