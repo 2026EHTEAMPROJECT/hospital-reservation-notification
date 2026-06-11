@@ -10,6 +10,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -18,6 +22,11 @@ public class NotificationService {
     private static final String UNKNOWN = "UNKNOWN";
     private static final String DEFAULT_PATIENT_NAME = "환자";
     private static final String DEFAULT_DOCTOR_NAME = "담당의";
+
+    // 예약 시각 문구 처리용 기본값.
+    // 취소/확정 이벤트는 booking-service 의 publishStatusChangeNotification 이
+    // reservationTime 을 보내지 않아 null 로 들어온다(예약 생성 이벤트만 시각 포함).
+    private static final String DEFAULT_RESERVATION_TIME = "예약하신 시간";
 
     private final LiveNotificationService liveNotificationService;
     private final UserClient userClient;
@@ -100,29 +109,33 @@ public class NotificationService {
                         ? doctor.name()
                         : DEFAULT_DOCTOR_NAME;
 
+        // 예약 시각을 "H시 m분" 형식으로 변환한다.
+        // reservationTime 은 booking-service 에서 LocalDateTime.toString()(ISO-8601)으로 전달된다.
+        String reservationTime = formatReservationTime(message.reservationTime());
+
         return switch (status) {
 
+            // 예약 생성(WAITING): 예약자 이름은 patientId 로 user-service 에서 조회한 값을 사용.
             case "WAITING" ->
-                    "%s님, %s 예약이 접수되었습니다. (예약번호: %d)"
+                    "%s님 %s 예약이되었습니다"
                             .formatted(
                                     name,
-                                    message.reservationTime(),
-                                    message.reservationId()
+                                    reservationTime
                             );
 
+            // 예약 확정(CONFIRMED): 담당의 이름은 doctorId 로 user-service 에서 조회한 값을 사용.
+            // 취소/확정 이벤트는 reservationTime 을 전달받지 못해 기본 문구로 대체될 수 있음.
             case "CONFIRMED" ->
-                    "%s님, %s 예약이 확정되었습니다. 담당의: %s"
+                    "환자님, %s 예약이 확정되었습니다. 담당의: %s"
                             .formatted(
-                                    name,
-                                    message.reservationTime(),
+                                    reservationTime,
                                     doctorName
                             );
 
             case "CANCELED" ->
-                    "%s님, 예약(번호: %d)이 취소되었습니다."
+                    "환자님, %s 예약이 취소되었습니다."
                             .formatted(
-                                    name,
-                                    message.reservationId()
+                                    reservationTime
                             );
 
             case "PAYMENT_FAILED" ->
@@ -139,6 +152,27 @@ public class NotificationService {
                                     status
                             );
         };
+    }
+
+    // reservationTime(ISO-8601 문자열)을 "H시 m분" 형식으로 변환한다.
+    // 값이 없거나(취소/확정 이벤트) 파싱할 수 없는 경우 기본 문구를 반환한다.
+    private String formatReservationTime(String reservationTime) {
+        if (reservationTime == null || reservationTime.isBlank()) {
+            return DEFAULT_RESERVATION_TIME;
+        }
+        try {
+            LocalDateTime dateTime =
+                    LocalDateTime.parse(reservationTime);
+            return dateTime.format(
+                    DateTimeFormatter.ofPattern("H시 m분")
+            );
+        } catch (DateTimeParseException e) {
+            log.warn(
+                    "예약 시각 파싱 실패: {}",
+                    reservationTime
+            );
+            return DEFAULT_RESERVATION_TIME;
+        }
     }
 
     private String buildPaymentMessage(PaymentMessage message) {
