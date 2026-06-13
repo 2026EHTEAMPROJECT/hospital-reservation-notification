@@ -5,5 +5,7 @@ public record BookingMessage(
         Long patientId,
         Long doctorId,
         String status,
-        String reservationTime
+        String reservationTime,
+        String patientName,
+        String doctorName
 ) {}

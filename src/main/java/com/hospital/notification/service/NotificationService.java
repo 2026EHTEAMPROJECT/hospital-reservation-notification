@@ -100,14 +100,14 @@ public class NotificationService {
                         : UNKNOWN;
 
         String name =
-                user != null
-                        ? user.name()
-                        : DEFAULT_PATIENT_NAME;
+                (message.patientName() != null && !message.patientName().isBlank())
+                        ? message.patientName()
+                        : (user != null ? user.name() : DEFAULT_PATIENT_NAME);
 
         String doctorName =
-                doctor != null
-                        ? doctor.name()
-                        : DEFAULT_DOCTOR_NAME;
+                (message.doctorName() != null && !message.doctorName().isBlank())
+                        ? message.doctorName()
+                        : (doctor != null ? doctor.name() : DEFAULT_DOCTOR_NAME);
 
         // 예약 시각을 "H시 m분" 형식으로 변환한다.
         // reservationTime 은 booking-service 에서 LocalDateTime.toString()(ISO-8601)으로 전달된다.
@@ -126,15 +126,17 @@ public class NotificationService {
             // 예약 확정(CONFIRMED): 담당의 이름은 doctorId 로 user-service 에서 조회한 값을 사용.
             // 취소/확정 이벤트는 reservationTime 을 전달받지 못해 기본 문구로 대체될 수 있음.
             case "CONFIRMED" ->
-                    "환자님, %s 예약이 확정되었습니다. 담당의: %s"
+                    "%s님, %s 예약이 확정되었습니다. 담당의: %s"
                             .formatted(
+                                    name,
                                     reservationTime,
                                     doctorName
                             );
 
             case "CANCELED" ->
-                    "환자님, %s 예약이 취소되었습니다."
+                    "%s님, %s 예약이 취소되었습니다."
                             .formatted(
+                                    name,
                                     reservationTime
                             );
 
